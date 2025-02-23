@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import HTMLResponse
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from jinja2 import Environment, FileSystemLoader
 from google import genai
 import re
@@ -10,25 +10,34 @@ import os
 # Initialize FastAPI
 app = FastAPI()
 
-# Setup database
+# Environment Variables
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("Missing GEMINI_API_KEY environment variable")
+
+# Initialize Google AI Client
+client = genai.Client(api_key=GEMINI_API_KEY)
+
+# Setup Database
 DATABASE_URL = "sqlite:///./data.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=GEMINI_API_KEY)
 
-def get_db():
+# Utility Functions
+def get_db() -> Session:
+    """Dependency to get a new database session."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-# Setup Jinja2
-env = Environment(loader=FileSystemLoader("templates"))
+# Jinja2 Setup
+templates_env = Environment(loader=FileSystemLoader("templates"))
 
-def render_template(template_name, **context):
-    template = env.get_template(template_name)
+def render_template(template_name: str, **context) -> HTMLResponse:
+    """Renders an HTML template with the given context."""
+    template = templates_env.get_template(template_name)
     return HTMLResponse(content=template.render(context))
 
 # Dummy function for NL to SQL conversion (Replace with AI model later)
@@ -86,20 +95,26 @@ def convert_nl_to_sql(nl_query: str) -> str:
     """
 
     response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    
     sql_query = response.text.strip()
     sql_query = re.sub(r"```sql\n|```", "", sql_query).strip()
+
+    # Prevent destructive SQL commands
     forbidden_keywords = {"DELETE", "UPDATE", "DROP", "TRUNCATE", "ALTER", "INSERT"}
     if any(word in sql_query.upper() for word in forbidden_keywords):
-        raise Exception("Forbidden keywords found in SQL")
+        raise ValueError("Forbidden SQL operation detected")
+
     return sql_query
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
 def home():
+    """Renders the home page."""
     return render_template("index.html")
 
 @app.post("/query")
-def query(nl_query: str = Form(...), db=Depends(get_db)):
+def query(nl_query: str = Form(...), db: Session = Depends(get_db)):
+    """Handles the natural language query, converts it to SQL, and fetches results."""
     try:
         sql_query = convert_nl_to_sql(nl_query)
         result = db.execute(text(sql_query))
@@ -108,4 +123,5 @@ def query(nl_query: str = Form(...), db=Depends(get_db)):
         results = [dict(zip(columns, row)) for row in rows]
     except Exception as e:
         return render_template("results.html", query=sql_query, error=str(e), results=None)
+
     return render_template("results.html", query=sql_query, results=results)
