@@ -7,7 +7,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.6"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex justify-center items-center min-h-screen">
+<body class="bg-gray-100 flex flex-col items-center min-h-screen p-6">
     <div class="bg-white p-6 rounded-xl shadow-md w-full max-w-lg">
         <h1 class="text-2xl font-bold text-gray-800 mb-4">Enter a Natural Language Query</h1>
         <form hx-post="/query" hx-target="#results" hx-swap="innerHTML" class="space-y-4">
@@ -17,7 +17,9 @@
                 Submit
             </button>
         </form>
-        <div id="results" class="mt-6"></div>
     </div>
+
+    <!-- Results Section (Full Width) -->
+    <div id="results" class="mt-6 w-full max-w-6xl"></div>
 </body>
 </html>
