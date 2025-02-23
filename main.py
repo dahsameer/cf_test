@@ -82,7 +82,7 @@ def convert_nl_to_sql(nl_query: str) -> str:
 
     Natural Language Query: "{nl_query}"
     
-    Provide only the SQL query, without markdown formatting
+    Provide only the SQL query. if the natural language doesn't specify number of rows, limit the query to 20 rows.
     """
 
     response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
