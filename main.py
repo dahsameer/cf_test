@@ -88,7 +88,10 @@ def convert_nl_to_sql(nl_query: str) -> str:
     response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     sql_query = response.text.strip()
     sql_query = re.sub(r"```sql\n|```", "", sql_query).strip()
-    return sql_query  # Replace with actual logic
+    forbidden_keywords = {"DELETE", "UPDATE", "DROP", "TRUNCATE", "ALTER", "INSERT"}
+    if any(word in sql_query.upper() for word in forbidden_keywords):
+        raise Exception("Forbidden keywords found in SQL")
+    return sql_query
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
